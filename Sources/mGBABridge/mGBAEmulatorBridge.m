@@ -74,6 +74,8 @@ static int rumbleDown = 0;
 static struct GBALuminanceSource lux;
 static uint8_t luxLevel = 0;
 
+static const NSUInteger LIVE_SKIN_INITIAL_CAPACITY = 1024;
+
 @implementation mGBAEmulatorBridge
 @synthesize audioRenderer = _audioRenderer;
 @synthesize videoRenderer = _videoRenderer;
@@ -128,6 +130,10 @@ static uint8_t luxLevel = 0;
         _idleOptimization = @"Remove Known";
         _gyroscopeSensitivity = 1;
         _accelerometerSensitivity = 1;
+
+        self.liveSkinAddresses = [NSMutableDictionary dictionaryWithCapacity:LIVE_SKIN_INITIAL_CAPACITY];
+        self.liveSkinPointers = [NSMutableDictionary dictionaryWithCapacity:LIVE_SKIN_INITIAL_CAPACITY];
+        self.liveSkinValues = [NSMutableDictionary dictionaryWithCapacity:LIVE_SKIN_INITIAL_CAPACITY];
     }
     
     return self;
@@ -196,6 +202,8 @@ static uint8_t luxLevel = 0;
     {
         memcpy(self.videoRenderer.videoBuffer, self.videoBuffer.mutableBytes, self.videoBuffer.length);
         [self.videoRenderer processFrame];
+        
+        [self processLiveSkinValues];
     }
     
     if (rumbleUp)
@@ -456,6 +464,133 @@ uint8_t _readLuminanceGBA(struct GBALuminanceSource* source)
     }
     
     return 0xFF - value;
+}
+
+#pragma mark - Live Skin -
+
+- (void)processLiveSkinValues
+{
+    // Loop through liveSkinPointers and update liveSkinAddresses
+    for (NSString *key in self.liveSkinPointers.allKeys)
+    {
+        NSArray *pointerArray = self.liveSkinPointers[key];
+        NSInteger pointer = [pointerArray[0] integerValue];
+        NSInteger valueOffset = [pointerArray[1] integerValue];
+        NSInteger bitWidth = [pointerArray[2] integerValue];
+        NSInteger bitOffset = [pointerArray[3] integerValue];
+        if (pointer == 0) { continue; }
+
+        uint32_t address = core->rawRead32(core, (int)pointer, 32);
+        address += valueOffset;
+        if (address == 0) { continue; }
+        
+        if (bitWidth + bitOffset <= 8) {
+            uint8_t value = core->rawRead8(core, (int)address, (int)bitWidth);
+            
+            // Extract the necessary bits based on bit width and offset
+            if (bitOffset > 0)
+                value = value >> bitOffset;
+            if (bitWidth < 8)
+                value = value & ((1 << bitWidth) - 1);
+
+            self.liveSkinValues[key] = [NSNumber numberWithInt:value];
+        }
+        else if (bitWidth + bitOffset <= 16)
+        {
+            uint16_t value = core->rawRead16(core, (int)address, (int)bitWidth);
+
+            // Extract the necessary bits based on bit width and offset
+            if (bitOffset > 0)
+                value = value >> bitOffset;
+            if (bitWidth < 16)
+                value = value & ((1 << bitWidth) - 1);
+            
+            self.liveSkinValues[key] = [NSNumber numberWithInt:value];
+        }
+        else if (bitWidth + bitOffset <= 32)
+        {
+            uint32_t value = core->rawRead32(core, (int)address, (int)bitWidth);
+
+            // Extract the necessary bits based on bit width and offset
+            if (bitOffset > 0)
+                value = value >> bitOffset;
+            if (bitWidth < 32)
+                value = value & ((1 << bitWidth) - 1);
+            
+            self.liveSkinValues[key] = [NSNumber numberWithInt:value];
+        }
+    }
+
+    // Loop through liveSkinAddresses and update liveSkinValues
+    for (NSString *key in self.liveSkinAddresses.allKeys)
+    {
+        NSArray *addressAndBitWidth = self.liveSkinAddresses[key];
+        NSInteger address = [addressAndBitWidth[0] integerValue];
+        NSInteger bitWidth = [addressAndBitWidth[1] integerValue];
+        NSInteger bitOffset = [addressAndBitWidth[2] integerValue];
+        if (address == 0) { continue; }
+        
+        if (bitWidth + bitOffset <= 8) {
+            uint8_t value = core->rawRead8(core, (int)address, (int)bitWidth);
+            
+            // Extract the necessary bits based on bit width and offset
+            if (bitOffset > 0)
+                value = value >> bitOffset;
+            if (bitWidth < 8)
+                value = value & ((1 << bitWidth) - 1);
+
+            self.liveSkinValues[key] = [NSNumber numberWithInt:value];
+        }
+        else if (bitWidth + bitOffset <= 16)
+        {
+            uint16_t value = core->rawRead16(core, (int)address, (int)bitWidth);
+
+            // Extract the necessary bits based on bit width and offset
+            if (bitOffset > 0)
+                value = value >> bitOffset;
+            if (bitWidth < 16)
+                value = value & ((1 << bitWidth) - 1);
+            
+            self.liveSkinValues[key] = [NSNumber numberWithInt:value];
+        }
+        else if (bitWidth + bitOffset <= 32)
+        {
+            uint32_t value = core->rawRead32(core, (int)address, (int)bitWidth);
+
+            // Extract the necessary bits based on bit width and offset
+            if (bitOffset > 0)
+                value = value >> bitOffset;
+            if (bitWidth < 32)
+                value = value & ((1 << bitWidth) - 1);
+            
+            self.liveSkinValues[key] = [NSNumber numberWithInt:value];
+        }
+    }
+}
+
+- (void)setLiveSkinAddress:(NSString*)key address:(NSInteger)address bitWidth:(NSInteger)bitWidth bitOffset:(NSInteger)bitOffset
+{
+    if ([self.liveSkinAddresses objectForKey:key]) { return; }
+    self.liveSkinAddresses[key] = @[ [NSNumber numberWithInteger:address], [NSNumber numberWithInteger:bitWidth], [NSNumber numberWithInteger:bitOffset] ];
+}
+
+- (void)setLiveSkinPointer:(NSString*)key pointer:(NSInteger)pointer valueOffset:(NSInteger)valueOffset bitWidth:(NSInteger)bitWidth bitOffset:(NSInteger)bitOffset
+{
+    if ([self.liveSkinPointers objectForKey:key]) { return; }
+    self.liveSkinPointers[key] = @[ [NSNumber numberWithInteger:pointer], [NSNumber numberWithInteger:valueOffset], [NSNumber numberWithInteger:bitWidth], [NSNumber numberWithInteger:bitOffset] ];
+}
+
+- (int)getLiveSkinValue:(NSString*)key
+{
+    NSNumber *value = self.liveSkinValues[key];
+    return [value intValue];
+}
+
+- (void)resetLiveSkin
+{
+    [self.liveSkinAddresses removeAllObjects];
+    [self.liveSkinPointers removeAllObjects];
+    [self.liveSkinValues removeAllObjects];
 }
 
 @end

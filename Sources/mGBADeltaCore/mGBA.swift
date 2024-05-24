@@ -52,6 +52,8 @@ public struct mGBA: DeltaCoreProtocol
     
     public var resourceBundle: Bundle { Bundle.module }
     
+    public var isLiveSkinSupported: Bool { true }
+
     private init()
     {
     }

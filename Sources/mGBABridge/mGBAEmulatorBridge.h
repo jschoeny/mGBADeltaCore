@@ -29,6 +29,11 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) int luxLevel;
 //@property (nonatomic) BOOL luxAllowed;
 
+// Live Skin
+@property (nonatomic) NSMutableDictionary<NSString *, NSArray<NSNumber *> *> *liveSkinAddresses;
+@property (nonatomic) NSMutableDictionary<NSString *, NSArray<NSNumber *> *> *liveSkinPointers;
+@property (nonatomic) NSMutableDictionary<NSString *, NSNumber *> *liveSkinValues;
+
 - (void)updateSettings;
 
 @end
